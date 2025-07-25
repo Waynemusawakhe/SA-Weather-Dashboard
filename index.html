@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Weather App - South Africa</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts - Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            /* South African inspired gradient background */
+            background: linear-gradient(to bottom right, #fefcbf, #d1fae5); /* Light yellow to light green */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background-color: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .flag-container {
+            margin-bottom: 15px;
+        }
+        .flag-container img {
+            width: 50px; /* Smaller flag */
+            height: auto;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+        .input-group input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        .input-group input:focus {
+            outline: none;
+            border-color: #10b981; /* Emerald-500 */
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+        .input-group button {
+            padding: 12px 20px;
+            background-color: #10b981; /* Emerald-500 - more vibrant green */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .input-group button:hover {
+            background-color: #059669; /* Emerald-600 */
+            transform: translateY(-1px);
+        }
+        .input-group button:active {
+            transform: translateY(0);
+        }
+        .weather-info {
+            background-color: #e0f2f7; /* Lighter blue-gray for info box */
+            border-radius: 12px;
+            padding: 25px;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
+            background-size: cover; /* Ensure image covers the area */
+            background-position: center; /* Center the image */
+            color: white; /* Default text color for better contrast on image */
+            position: relative; /* For overlay */
+            overflow: hidden; /* Ensure content stays within bounds */
+        }
+        .weather-info::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.3); /* Dark overlay for text readability */
+            border-radius: 12px;
+            z-index: 1;
+        }
+        .weather-info > * {
+            position: relative;
+            z-index: 2; /* Ensure content is above the overlay */
+        }
+        .weather-info h2, .weather-info p {
+            color: white; /* Ensure text is white on image background */
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.5); /* Add text shadow for readability */
+        }
+        .weather-info .temperature {
+            color: white; /* Ensure temperature is white on image background */
+        }
+        .weather-info .weather-icon {
+            font-size: 60px; /* Larger icon size */
+            margin-bottom: 10px;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.6)); /* Shadow for icons */
+        }
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #10b981; /* Emerald-500 */
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        @media (max-width: 600px) {
+            .input-group {
+                flex-direction: column;
+            }
+            .input-group button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="flag-container">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/af/Flag_of_South_Africa.svg/50px-Flag_of_South_Africa.svg.png" alt="South African Flag">
+        </div>
+        <h1 class="text-3xl font-bold text-gray-800">South African Weather</h1>
+        <div class="input-group">
+            <input type="text" id="cityInput" placeholder="Enter city name" class="rounded-lg" list="citySuggestions">
+            <datalist id="citySuggestions"></datalist>
+            <button id="getWeatherBtn" class="rounded-lg">Get Weather</button>
+        </div>
+        <div id="weatherResult" class="weather-info rounded-lg">
+            <p class="text-gray-600">Enter a city to see the weather!</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const cityInput = document.getElementById('cityInput');
+            const getWeatherBtn = document.getElementById('getWeatherBtn');
+            const weatherResult = document.getElementById('weatherResult');
+            const citySuggestions = document.getElementById('citySuggestions');
+
+
+            const API_KEY = '572d34c3a1324c2e8f493447252507';
+            const BASE_URL = 'https://api.weatherapi.com/v1/current.json';
+
+            // Static data for city suggestions and background images (not for weather data)
+            const cityDataForSuggestions = {
+                "johannesburg": {
+                    city: "Johannesburg",
+                    imageUrl: "download.jpeg"
+                    
+                    
+                },
+                "cape town": {
+                    city: "Cape Town",
+                    imageUrl: "cape.jpg"
+                },
+                "durban": {
+                    city: "Durban",
+                    imageUrl: "Durban.jpg"
+                },
+                "pretoria": {
+                    city: "Pretoria",
+                    imageUrl: "pre.jpg"
+                },
+                "port elizabeth": {
+                    city: "Port Elizabeth",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Port+Elizabeth"
+                },
+                "bloemfontein": {
+                    city: "Bloemfontein",
+                    imageUrl: "bloem.jpg"
+                },
+                "nelspruit": {
+                    city: "Mbombela", // Renamed to Mbombela for accuracy
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Mbombela"
+                },
+                "polokwane": {
+                    city: "Polokwane",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Polokwane"
+                },
+                "kimberley": {
+                    city: "Kimberley",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Kimberley"
+                },
+                "east london": {
+                    city: "East London",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=East+London"
+                },
+                "pietermaritzburg": {
+                    city: "Pietermaritzburg",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Pietermaritzburg"
+                },
+                "george": {
+                    city: "George",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=George"
+                },
+                "rustenburg": {
+                    city: "Rustenburg",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Rustenburg"
+                },
+                "saldanha bay": {
+                    city: "Saldanha Bay",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Saldanha+Bay"
+                },
+                "upington": {
+                    city: "Upington",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Upington"
+                },
+                "bloem": { // Added common abbreviation
+                    city: "Bloemfontein",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Bloemfontein"
+                },
+                "pe": { // Added common abbreviation
+                    city: "Port Elizabeth",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Port+Elizabeth"
+                },
+                "mbombela": { // Added official name for Nelspruit
+                    city: "Mbombela",
+                    imageUrl: "https://placehold.co/500x300/333333/FFFFFF?text=Mbombela"
+                }
+            };
+
+            // Map WeatherAPI.com condition codes to emojis
+            const weatherIconMap = {
+                // Day icons
+                1000: '☀️', // Clear/Sunny
+                1003: '🌤️', // Partly cloudy
+                1006: '☁️', // Cloudy
+                1009: ' overcast', // Overcast
+                1030: '🌫️', // Mist
+                1063: '🌦️', // Patchy rain possible
+                1066: '❄️', // Patchy snow possible (less likely in SA, but included)
+                1069: '🌧️', // Patchy sleet possible (less likely in SA)
+                1072: '🌧️', // Patchy freezing drizzle possible
+                1087: '⛈️', // Thundery outbreaks possible
+                1114: '❄️', // Blowing snow
+                1117: '🌨️', // Blizzard
+                1135: '🌫️', // Fog
+                1147: '🌫️', // Freezing fog
+                1150: '🌧️', // Patchy light drizzle
+                1153: '🌧️', // Light drizzle
+                1168: '🌧️', // Freezing drizzle
+                1171: '🌧️', // Heavy freezing drizzle
+                1180: '🌧️', // Patchy light rain
+                1183: '🌧️', // Light rain
+                1186: '🌧️', // Moderate rain at times
+                1189: '🌧️', // Moderate rain
+                1192: '🌧️', // Heavy rain at times
+                1195: '🌧️', // Heavy rain
+                1198: '🌧️', // Light freezing rain
+                1201: '🌧️', // Moderate or heavy freezing rain
+                1204: '🌧️', // Light sleet
+                1207: '🌧️', // Moderate or heavy sleet
+                1210: '🌨️', // Patchy light snow
+                1213: '🌨️', // Light snow
+                1216: '🌨️', // Patchy moderate snow
+                1219: '🌨️', // Moderate snow
+                1222: '🌨️', // Patchy heavy snow
+                1225: '🌨️', // Heavy snow
+                1237: '🧊', // Ice pellets
+                1240: '🌧️', // Light rain shower
+                1243: '🌧️', // Moderate or heavy rain shower
+                1246: '⛈️', // Torrential rain shower
+                1249: '🌧️', // Light sleet showers
+                1252: '🌧️', // Moderate or heavy sleet showers
+                1255: '🌨️', // Light snow showers
+                1258: '🌨️', // Moderate or heavy snow showers
+                1261: '🧊', // Light showers of ice pellets
+                1264: '🧊', // Moderate or heavy showers of ice pellets
+                1273: '⛈️', // Patchy light rain with thunder
+                1276: '⚡🌧️', // Moderate or heavy rain with thunder
+                1279: '🌨️⛈️', // Patchy light snow with thunder
+                1282: '🌨️⚡'  // Moderate or heavy snow with thunder
+
+                // Note: WeatherAPI.com provides a single code for day/night,
+                // so we don't need separate 'd' and 'n' entries like OpenWeatherMap.
+            };
+
+            // Function to get emoji based on WeatherAPI.com condition code
+            const getIconEmoji = (conditionCode) => {
+                return weatherIconMap[conditionCode] || '❓'; // Default to a question mark if not found
+            };
+
+            // Populate datalist for suggestions
+            const populateSuggestions = () => {
+                citySuggestions.innerHTML = ''; // Clear previous suggestions
+                // Use a Set to ensure unique city names for suggestions
+                const uniqueCities = new Set();
+                for (const key in cityDataForSuggestions) {
+                    uniqueCities.add(cityDataForSuggestions[key].city);
+                }
+                uniqueCities.forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city;
+                    citySuggestions.appendChild(option);
+                });
+            };
+
+            populateSuggestions(); // Call on load to populate suggestions
+
+            const fetchWeather = async () => {
+                const city = cityInput.value.trim();
+                if (!city) {
+                    weatherResult.innerHTML = `<p class="text-red-500">Please enter a city name.</p>`;
+                    // Reset background if input is empty
+                    weatherResult.style.backgroundImage = 'none';
+                    weatherResult.style.backgroundColor = '#e0f2f7'; // Original background color
+                    weatherResult.querySelector('p').style.color = '#4a5568'; // Original text color
+                    return;
+                }
+
+                // Show loading spinner and reset background
+                weatherResult.style.backgroundImage = 'none';
+                weatherResult.style.backgroundColor = '#e0f2f7'; // Reset background color
+                weatherResult.innerHTML = `
+                    <div class="loading-spinner"></div>
+                    <p class="text-gray-600">Fetching weather for ${city}...</p>
+                `;
+                // Ensure text color is reset for loading message
+                weatherResult.querySelector('p').style.color = '#4a5568';
+
+                try {
+                    // Construct the API URL for WeatherAPI.com
+                    const apiUrl = `${BASE_URL}?key=${API_KEY}&q=${city}`;
+                    console.log("Fetching from API URL:", apiUrl); // Log the API URL
+
+                    const response = await fetch(apiUrl);
+                    const data = await response.json();
+                    console.log("API Response Data:", data); // Log the full API response data
+
+                    if (response.ok) {
+                        // Get image URL from our static data, fallback to a generic one if not found
+                        const cityKey = city.toLowerCase();
+                        const imageUrl = (cityDataForSuggestions[cityKey] && cityDataForSuggestions[cityKey].imageUrl) ?
+                                         cityDataForSuggestions[cityKey].imageUrl :
+                                         `https://placehold.co/500x300/333333/FFFFFF?text=${encodeURIComponent(city)}`;
+
+                        weatherResult.style.backgroundImage = `url('${imageUrl}')`;
+                        weatherResult.style.backgroundColor = 'transparent'; // Make background transparent to show image
+
+                        const temperature = `${Math.round(data.current.temp_c)}°C`;
+                        const description = data.current.condition.text.charAt(0).toUpperCase() + data.current.condition.text.slice(1);
+                        const humidity = `${data.current.humidity}%`;
+                        const windSpeed = `${Math.round(data.current.wind_kph)} km/h`;
+                        const iconEmoji = getIconEmoji(data.current.condition.code); // Use condition code for emoji
+
+                        weatherResult.innerHTML = `
+                            <div class="weather-icon">${iconEmoji}</div>
+                            <h2 class="text-white">${data.location.name}</h2>
+                            <p class="temperature text-white">${temperature}</p>
+                            <p class="text-white">${description}</p>
+                            <p class="text-white">Humidity: ${humidity}</p>
+                            <p class="text-white">Wind Speed: ${windSpeed}</p>
+                        `;
+                    } else {
+                        // Handle API errors from WeatherAPI.com
+                        weatherResult.style.backgroundImage = 'none';
+                        weatherResult.style.backgroundColor = '#e0f2f7'; // Original background color
+                        let errorMessage = "Could not fetch weather data.";
+                        if (data.error && data.error.message) {
+                            errorMessage = `Error: ${data.error.message}`;
+                            if (data.error.code === 1002 || data.error.code === 2006) { // 1002: API key not provided, 2006: API key invalid
+                                errorMessage = "Error: Invalid WeatherAPI.com API key. Please check your key.";
+                            } else if (data.error.code === 1003) { // 1003: Parameter 'q' not provided (city not found)
+                                errorMessage = `Error: City "${city}" not found.`;
+                            }
+                        }
+                        weatherResult.innerHTML = `
+                            <p class="text-red-500">${errorMessage}</p>
+                            <p class="text-gray-600">Please ensure your API key is correct and active on WeatherAPI.com.</p>
+                            <p class="text-gray-600">Try a different city or check the console for more details.</p>
+                        `;
+                        weatherResult.querySelector('p:first-of-type').style.color = '#ef4444'; // Red for error message
+                        weatherResult.querySelector('p:last-of-type').style.color = '#4a5568'; // Gray for suggestions
+                    }
+                } catch (error) {
+                    console.error("Error fetching weather:", error);
+                    weatherResult.style.backgroundImage = 'none';
+                    weatherResult.style.backgroundColor = '#e0f2f7'; // Original background color
+                    weatherResult.innerHTML = `
+                        <p class="text-red-500">Network error or API issue.</p>
+                        <p class="text-gray-600">Please check your internet connection and try again.</p>
+                    `;
+                    weatherResult.querySelector('p:first-of-type').style.color = '#ef4444'; // Red for error message
+                    weatherResult.querySelector('p:last-of-type').style.color = '#4a5568'; // Gray for suggestions
+                }
+            };
+
+            getWeatherBtn.addEventListener('click', fetchWeather);
+
+            cityInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    fetchWeather();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
